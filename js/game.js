@@ -82,6 +82,135 @@ Game = (function(superClass) {
 
 Game.run();
 
+Grid = (function() {
+  function Grid(x1, y1, w1, h1, cx1, cy1) {
+    this.x = x1;
+    this.y = y1;
+    this.w = w1;
+    this.h = h1;
+    this.cx = cx1;
+    this.cy = cy1;
+    this._reserve(this.w * this.h);
+    this._random = new Random(1, this.w - 1);
+    this._max_random_tries = 5000;
+  }
+
+  Grid.prototype.get = function(x, y) {
+    return this._items[x + (y * this.w)];
+  };
+
+  Grid.prototype.unset = function(x, y) {
+    return this._items[x + (y * this.w)] = null;
+  };
+
+  Grid.prototype.set = function(x, y, item) {
+    item.grid = this;
+    item.xx = x;
+    item.yy = y;
+    item.zz = x + y;
+    return this._items[x + (y * this.w)] = item;
+  };
+
+  Grid.prototype.getNeighbours = function(x, y) {
+    var hh, list, ww, xl, xr, yb, yt;
+    list = new GridList();
+    ww = this.w - 2;
+    hh = this.h - 2;
+    xr = x + 1;
+    xl = x - 1;
+    yt = y - 1;
+    yb = y + 1;
+    if (x > 1 && y > 1 && (this.get(xl, yt) == null)) {
+      list.add(xl, yt);
+    }
+    if (y > 1 && (this.get(x, yt) == null)) {
+      list.add(x, yt);
+    }
+    if (x < this.w - 2 && y > 1 && (this.get(xr, yt) == null)) {
+      list.add(xr, yt);
+    }
+    if (x > 1 && (this.get(xl, y) == null)) {
+      list.add(xl, y);
+    }
+    if (x < this.w - 2 && (this.get(xr, y) == null)) {
+      list.add(xr, y);
+    }
+    if (x > 1 && y < this.h - 2 && (this.get(xl, yb) == null)) {
+      list.add(xl, yb);
+    }
+    if (y < this.h - 2 && (this.get(x, yb) == null)) {
+      list.add(x, yb);
+    }
+    if (x < this.w - 2 && y < this.h - 2 && (this.get(xr, yb) == null)) {
+      list.add(xr, yb);
+    }
+    return list;
+  };
+
+  Grid.prototype.toIso = function(x, y, ox, oy) {
+    var isox, isoy, ref;
+    ref = Iso.to((x * this.x) - ox, (y * this.y) - oy), isox = ref[0], isoy = ref[1];
+    return [isox + this.cx, isoy + this.cy];
+  };
+
+  Grid.prototype.getRandomWithIso = function(ox, oy) {
+    var isox, isoy, list, ref, ref1, x, y;
+    ref = this.random(), x = ref[0], y = ref[1], list = ref[2];
+    ref1 = this.toIso(x, y, ox, oy), isox = ref1[0], isoy = ref1[1];
+    return [x, y, isox, isoy, list];
+  };
+
+  Grid.prototype.getDebugWithIso = function(x, y, ox, oy) {
+    var isox, isoy, ref;
+    ref = this.toIso(x, y, ox, oy), isox = ref[0], isoy = ref[1];
+    return [x, y, isox, isoy, this.getNeighbours(x, y)];
+  };
+
+  Grid.prototype.random = function() {
+    var i, list, x, y;
+    i = 0;
+    x = -1;
+    y = -1;
+    list = null;
+    while (true) {
+      x = this._random.next();
+      y = this._random.next();
+      if (this.get(x, y) != null) {
+        continue;
+      }
+      list = this.getNeighbours(x, y);
+      if (list.length() > 5) {
+        break;
+      }
+      i += 1;
+      if (i === this._max_random_tries) {
+        return [-1, -1, null];
+      }
+    }
+    return [x, y, list];
+  };
+
+  Grid.prototype.clear = function() {
+    var i, j, ref;
+    for (i = j = 0, ref = this._items.length - 1; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
+      this._items[i] = null;
+    }
+    return null;
+  };
+
+  Grid.prototype._reserve = function(n) {
+    var i, j, ref;
+    this._items = [];
+    for (i = j = 0, ref = n - 1; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
+      this._items[i] = null;
+    }
+    return this._items;
+  };
+
+  return Grid;
+
+})();
+
 GridList = (function() {
   function GridList() {
     this.clear();
@@ -301,6 +430,87 @@ Heart = (function(superClass) {
 
 })(BaseLoot);
 
+Man = (function(superClass) {
+  extend(Man, superClass);
+
+  function Man(sprites1, grid) {
+    this.sprites = sprites1;
+    this.grid = grid;
+    this.spawnPit = bind(this.spawnPit, this);
+    Man.__super__.constructor.call(this, this.sprites.getTexture('man_one'));
+    this.exists = false;
+    this.addAnimation('one', this.sprites.getTexture('man_one'));
+    this.addAnimation('two', this.sprites.getTexture('man_two'));
+    this.timer = new Timer(300);
+    this.timer.ontick = (function(_this) {
+      return function() {
+        return _this.visible = !_this.visible;
+      };
+    })(this);
+    this.timer.onend = (function(_this) {
+      return function() {
+        return _this.kill();
+      };
+    })(this);
+    this.random = new Random();
+  }
+
+  Man.prototype.onkill = function() {};
+
+  Man.prototype.onoutofspace = function() {};
+
+  Man.prototype.kill = function() {
+    Man.__super__.kill.apply(this, arguments);
+    this.spawnHeart();
+    return this.reset();
+  };
+
+  Man.prototype.reset = function() {
+    var isox, isoy, list, ref, x, y;
+    ref = this.grid.getRandomWithIso(32, 48), x = ref[0], y = ref[1], isox = ref[2], isoy = ref[3], list = ref[4];
+    if (x === -1 && y === -1) {
+      this.onoutofspace();
+      return;
+    }
+    this.grid.set(x, y, this);
+    Man.__super__.reset.call(this, isox, isoy);
+    this.play(this.random.str());
+    return this.spawnPits(list);
+  };
+
+  Man.prototype.update = function(timer, input) {
+    Man.__super__.update.apply(this, arguments);
+    this.timer.update(timer);
+    if (!this.timer.active && this.group.pits.allAlive()) {
+      this.group.pits.clear();
+      this.onkill();
+      return this.timer.reset(5);
+    }
+  };
+
+  Man.prototype.spawnHeart = function() {
+    var heart;
+    heart = this.group.recycleByClass(Heart);
+    if (heart == null) {
+      heart = this.group.add(new Heart(this.sprites, this.grid));
+    }
+    return heart.reset(this.xx, this.yy);
+  };
+
+  Man.prototype.spawnPits = function(list) {
+    return list.each(this.spawnPit);
+  };
+
+  Man.prototype.spawnPit = function(point) {
+    var pit;
+    pit = this.group.pits.add(new Pit(this.sprites, this.grid));
+    return pit.reset(point.x, point.y);
+  };
+
+  return Man;
+
+})(Fz2D.Entity);
+
 Map = (function(superClass) {
   extend(Map, superClass);
 
@@ -418,6 +628,46 @@ Map = (function(superClass) {
 
 })(Fz2D.Group);
 
+Pit = (function(superClass) {
+  extend(Pit, superClass);
+
+  function Pit(sprites1, grid) {
+    var anim;
+    this.sprites = sprites1;
+    this.grid = grid;
+    Pit.__super__.constructor.call(this, this.sprites.getTexture('pit'));
+    anim = this.addAnimation('cycle', this.sprites.getTexture('pit_cycle'), 8, 800);
+    anim.onend = (function(_this) {
+      return function() {
+        return _this.kill();
+      };
+    })(this);
+  }
+
+  Pit.prototype.isOver = function(x, y) {
+    return this.xx === x && this.yy === y;
+  };
+
+  Pit.prototype.reset = function(x, y) {
+    var isox, isoy, ref;
+    if ((x != null) && (y != null)) {
+      this.xx = x;
+      this.yy = y;
+      ref = this.grid.toIso(x, y, -17, 0), isox = ref[0], isoy = ref[1];
+      Pit.__super__.reset.call(this, isox, isoy);
+      this.visible = false;
+      this.alive = false;
+    } else {
+      Pit.__super__.reset.apply(this, arguments);
+      this.play('cycle');
+    }
+    return this;
+  };
+
+  return Pit;
+
+})(Fz2D.Entity);
+
 Random = (function() {
   function Random(min, max) {
     this.min = min;
@@ -455,270 +705,6 @@ Random = (function() {
   };
 
   return Random;
-
-})();
-
-Timer = (function() {
-  function Timer(interval) {
-    this.interval = interval;
-    if (this.interval == null) {
-      this.interval = 1000;
-    }
-    this.stop();
-  }
-
-  Timer.prototype.stop = function() {
-    this._dt = 0;
-    this.ticks = 0;
-    this.active = false;
-    this.ended = false;
-    return this.onstop();
-  };
-
-  Timer.prototype.reset = function(ticks) {
-    this._dt = 0;
-    this.ticks = ticks || 0;
-    this.active = true;
-    this.ended = false;
-    return this.onstart();
-  };
-
-  Timer.prototype.update = function(timer) {
-    if (!this.active) {
-      return;
-    }
-    this._dt += timer.dt;
-    if (this._dt < this.interval) {
-      return;
-    }
-    this._dt = 0;
-    this.ontick();
-    if (this.ticks > 0 && --this.ticks === 0) {
-      this.active = false;
-      this.ended = true;
-      return this.onend();
-    }
-  };
-
-  Timer.prototype.onstart = function() {};
-
-  Timer.prototype.onstop = function() {};
-
-  Timer.prototype.ontick = function() {};
-
-  Timer.prototype.onend = function() {};
-
-  return Timer;
-
-})();
-
-Man = (function(superClass) {
-  extend(Man, superClass);
-
-  function Man(sprites1, grid) {
-    this.sprites = sprites1;
-    this.grid = grid;
-    this.spawnPit = bind(this.spawnPit, this);
-    Man.__super__.constructor.call(this, this.sprites.getTexture('man_one'));
-    this.exists = false;
-    this.addAnimation('one', this.sprites.getTexture('man_one'));
-    this.addAnimation('two', this.sprites.getTexture('man_two'));
-    this.timer = new Timer(300);
-    this.timer.ontick = (function(_this) {
-      return function() {
-        return _this.visible = !_this.visible;
-      };
-    })(this);
-    this.timer.onend = (function(_this) {
-      return function() {
-        return _this.kill();
-      };
-    })(this);
-    this.random = new Random();
-  }
-
-  Man.prototype.onkill = function() {};
-
-  Man.prototype.onoutofspace = function() {};
-
-  Man.prototype.kill = function() {
-    Man.__super__.kill.apply(this, arguments);
-    this.spawnHeart();
-    return this.reset();
-  };
-
-  Man.prototype.reset = function() {
-    var isox, isoy, list, ref, x, y;
-    ref = this.grid.getRandomWithIso(32, 48), x = ref[0], y = ref[1], isox = ref[2], isoy = ref[3], list = ref[4];
-    if (x === -1 && y === -1) {
-      this.onoutofspace();
-      return;
-    }
-    this.grid.set(x, y, this);
-    Man.__super__.reset.call(this, isox, isoy);
-    this.play(this.random.str());
-    return this.spawnPits(list);
-  };
-
-  Man.prototype.update = function(timer, input) {
-    Man.__super__.update.apply(this, arguments);
-    this.timer.update(timer);
-    if (!this.timer.active && this.group.pits.allAlive()) {
-      this.group.pits.clear();
-      this.onkill();
-      return this.timer.reset(5);
-    }
-  };
-
-  Man.prototype.spawnHeart = function() {
-    var heart;
-    heart = this.group.recycleByClass(Heart);
-    if (heart == null) {
-      heart = this.group.add(new Heart(this.sprites, this.grid));
-    }
-    return heart.reset(this.xx, this.yy);
-  };
-
-  Man.prototype.spawnPits = function(list) {
-    return list.each(this.spawnPit);
-  };
-
-  Man.prototype.spawnPit = function(point) {
-    var pit;
-    pit = this.group.pits.add(new Pit(this.sprites, this.grid));
-    return pit.reset(point.x, point.y);
-  };
-
-  return Man;
-
-})(Fz2D.Entity);
-
-Grid = (function() {
-  function Grid(x1, y1, w1, h1, cx1, cy1) {
-    this.x = x1;
-    this.y = y1;
-    this.w = w1;
-    this.h = h1;
-    this.cx = cx1;
-    this.cy = cy1;
-    this._reserve(this.w * this.h);
-    this._random = new Random(1, this.w - 1);
-    this._max_random_tries = 5000;
-  }
-
-  Grid.prototype.get = function(x, y) {
-    return this._items[x + (y * this.w)];
-  };
-
-  Grid.prototype.unset = function(x, y) {
-    return this._items[x + (y * this.w)] = null;
-  };
-
-  Grid.prototype.set = function(x, y, item) {
-    item.grid = this;
-    item.xx = x;
-    item.yy = y;
-    item.zz = x + y;
-    return this._items[x + (y * this.w)] = item;
-  };
-
-  Grid.prototype.getNeighbours = function(x, y) {
-    var hh, list, ww, xl, xr, yb, yt;
-    list = new GridList();
-    ww = this.w - 2;
-    hh = this.h - 2;
-    xr = x + 1;
-    xl = x - 1;
-    yt = y - 1;
-    yb = y + 1;
-    if (x > 1 && y > 1 && (this.get(xl, yt) == null)) {
-      list.add(xl, yt);
-    }
-    if (y > 1 && (this.get(x, yt) == null)) {
-      list.add(x, yt);
-    }
-    if (x < this.w - 2 && y > 1 && (this.get(xr, yt) == null)) {
-      list.add(xr, yt);
-    }
-    if (x > 1 && (this.get(xl, y) == null)) {
-      list.add(xl, y);
-    }
-    if (x < this.w - 2 && (this.get(xr, y) == null)) {
-      list.add(xr, y);
-    }
-    if (x > 1 && y < this.h - 2 && (this.get(xl, yb) == null)) {
-      list.add(xl, yb);
-    }
-    if (y < this.h - 2 && (this.get(x, yb) == null)) {
-      list.add(x, yb);
-    }
-    if (x < this.w - 2 && y < this.h - 2 && (this.get(xr, yb) == null)) {
-      list.add(xr, yb);
-    }
-    return list;
-  };
-
-  Grid.prototype.toIso = function(x, y, ox, oy) {
-    var isox, isoy, ref;
-    ref = Iso.to((x * this.x) - ox, (y * this.y) - oy), isox = ref[0], isoy = ref[1];
-    return [isox + this.cx, isoy + this.cy];
-  };
-
-  Grid.prototype.getRandomWithIso = function(ox, oy) {
-    var isox, isoy, list, ref, ref1, x, y;
-    ref = this.random(), x = ref[0], y = ref[1], list = ref[2];
-    ref1 = this.toIso(x, y, ox, oy), isox = ref1[0], isoy = ref1[1];
-    return [x, y, isox, isoy, list];
-  };
-
-  Grid.prototype.getDebugWithIso = function(x, y, ox, oy) {
-    var isox, isoy, ref;
-    ref = this.toIso(x, y, ox, oy), isox = ref[0], isoy = ref[1];
-    return [x, y, isox, isoy, this.getNeighbours(x, y)];
-  };
-
-  Grid.prototype.random = function() {
-    var i, list, x, y;
-    i = 0;
-    x = -1;
-    y = -1;
-    list = null;
-    while (true) {
-      x = this._random.next();
-      y = this._random.next();
-      if (this.get(x, y) != null) {
-        continue;
-      }
-      list = this.getNeighbours(x, y);
-      if (list.length() > 5) {
-        break;
-      }
-      i += 1;
-      if (i === this._max_random_tries) {
-        return [-1, -1, null];
-      }
-    }
-    return [x, y, list];
-  };
-
-  Grid.prototype.clear = function() {
-    var i, j, ref;
-    for (i = j = 0, ref = this._items.length - 1; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
-      this._items[i] = null;
-    }
-    return null;
-  };
-
-  Grid.prototype._reserve = function(n) {
-    var i, j, ref;
-    this._items = [];
-    for (i = j = 0, ref = n - 1; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
-      this._items[i] = null;
-    }
-    return this._items;
-  };
-
-  return Grid;
 
 })();
 
@@ -848,7 +834,7 @@ Snake = (function(superClass) {
     for (i = j = 0, ref = this.parts.length - 1; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
       this.group.pits.each((function(_this) {
         return function(pit) {
-          if (pit.exists && pit.isOver(x, y)) {
+          if (pit.isOver(x, y)) {
             pit.reset();
             return false;
           }
@@ -896,42 +882,56 @@ Snake = (function(superClass) {
 
 })(Fz2D.Entity);
 
-Pit = (function(superClass) {
-  extend(Pit, superClass);
-
-  function Pit(sprites1, grid) {
-    var anim;
-    this.sprites = sprites1;
-    this.grid = grid;
-    Pit.__super__.constructor.call(this, this.sprites.getTexture('pit'));
-    anim = this.addAnimation('cycle', this.sprites.getTexture('pit_cycle'), 8, 800);
-    anim.onend = (function(_this) {
-      return function() {
-        return _this.kill();
-      };
-    })(this);
+Timer = (function() {
+  function Timer(interval) {
+    this.interval = interval;
+    if (this.interval == null) {
+      this.interval = 1000;
+    }
+    this.stop();
   }
 
-  Pit.prototype.isOver = function(x, y) {
-    return this.xx === x && this.yy === y;
+  Timer.prototype.stop = function() {
+    this._dt = 0;
+    this.ticks = 0;
+    this.active = false;
+    this.ended = false;
+    return this.onstop();
   };
 
-  Pit.prototype.reset = function(x, y) {
-    var isox, isoy, ref;
-    if ((x != null) && (y != null)) {
-      this.xx = x;
-      this.yy = y;
-      ref = this.grid.toIso(x, y, -17, 0), isox = ref[0], isoy = ref[1];
-      Pit.__super__.reset.call(this, isox, isoy);
-      this.visible = false;
-      this.alive = false;
-    } else {
-      Pit.__super__.reset.apply(this, arguments);
-      this.play('cycle');
+  Timer.prototype.reset = function(ticks) {
+    this._dt = 0;
+    this.ticks = ticks || 0;
+    this.active = true;
+    this.ended = false;
+    return this.onstart();
+  };
+
+  Timer.prototype.update = function(timer) {
+    if (!this.active) {
+      return;
     }
-    return this;
+    this._dt += timer.dt;
+    if (this._dt < this.interval) {
+      return;
+    }
+    this._dt = 0;
+    this.ontick();
+    if (this.ticks > 0 && --this.ticks === 0) {
+      this.active = false;
+      this.ended = true;
+      return this.onend();
+    }
   };
 
-  return Pit;
+  Timer.prototype.onstart = function() {};
 
-})(Fz2D.Entity);
+  Timer.prototype.onstop = function() {};
+
+  Timer.prototype.ontick = function() {};
+
+  Timer.prototype.onend = function() {};
+
+  return Timer;
+
+})();

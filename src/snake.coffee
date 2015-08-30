@@ -114,7 +114,7 @@ class Snake extends Fz2D.Entity
 
     for i in [0..@parts.length-1]
       @group.pits.each (pit) =>
-        if pit.exists and pit.isOver(x, y)
+        if pit.isOver(x, y)
           pit.reset()
           return false
 
