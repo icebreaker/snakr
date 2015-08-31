@@ -143,10 +143,13 @@ class Snake extends Fz2D.Entity
 
     @move(timer.dt)
 
-    dx = input.keys.pressed[Key.DOWN] - input.keys.pressed[Key.UP]
-    dy = input.keys.pressed[Key.LEFT] - input.keys.pressed[Key.RIGHT]
+    #dx = input.keys.pressed[Key.DOWN] - input.keys.pressed[Key.UP]
+    #dy = input.keys.pressed[Key.LEFT] - input.keys.pressed[Key.RIGHT]
 
-    @turn(dx, dy)
+    dx = input.keys.pressed[Key.DOWN] - input.keys.pressed[Key.UP]
+    dy = input.keys.pressed[Key.RIGHT] - input.keys.pressed[Key.LEFT]
+
+    @turn(dy, dx)
 
   _play: () ->
     if @_dx > 0
