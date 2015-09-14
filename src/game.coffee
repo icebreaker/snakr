@@ -1,7 +1,7 @@
 class Game extends Fz2D.Game
   Key = Fz2D.Input.Keyboard.Key
 
-  version: '0.0.1'
+  version: '0.0.2'
 
   w: window.innerWidth
   h: window.innerHeight
