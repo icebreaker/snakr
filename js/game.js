@@ -4,6 +4,89 @@ var BaseLoot, Game, Grid, Heart, Hud, Iso, IsoGroup, Man, Map, NeighborList, Pit
   hasProp = {}.hasOwnProperty,
   bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
+Game = (function(superClass) {
+  var Key;
+
+  extend(Game, superClass);
+
+  function Game() {
+    return Game.__super__.constructor.apply(this, arguments);
+  }
+
+  Key = Fz2D.Input.Keyboard.Key;
+
+  Game.prototype.version = '0.0.2';
+
+  Game.prototype.w = window.innerWidth;
+
+  Game.prototype.h = window.innerHeight;
+
+  Game.prototype.bg = '#D4D1A4';
+
+  Game.prototype.fg = '#000000';
+
+  Game.prototype.assets = {
+    sprites: 'sprites.atlas',
+    sounds: {
+      pickup: 'pickup.ogg',
+      hit: 'hit.ogg',
+      death: 'death.ogg'
+    }
+  };
+
+  Game.prototype.plugins = [Fz2D.Plugins.GitHub, Fz2D.Plugins.Stats, Fz2D.Plugins.Console, Fz2D.Plugins.GoogleAnalytics];
+
+  Game.prototype.github = {
+    username: 'icebreaker',
+    repository: 'snakr'
+  };
+
+  Game.prototype.ga = {
+    id: 'UA-3042007-2'
+  };
+
+  Game.prototype.volume = 10;
+
+  Game.prototype.onload = function(game) {
+    var assets, hud, k, map, scene, sound, sounds, sprites, storage;
+    if (Fz2D.production != null) {
+      game.input.mouse.hide();
+    }
+    assets = game.assets;
+    scene = game.scene;
+    storage = game.storage;
+    sprites = assets.sprites;
+    sounds = assets.sounds;
+    for (k in sounds) {
+      sound = sounds[k];
+      sound.setVolume(game.volume);
+    }
+    hud = new Hud(scene.w, scene.h, sprites, storage, game.version);
+    map = new Map(scene.w, scene.h, sprites, sounds);
+    hud.onprestart = function() {
+      map.reset();
+      map.snake.alive = false;
+      return map.snake.control_scheme = hud.getControlScheme();
+    };
+    hud.onstart = function() {
+      return map.snake.alive = true;
+    };
+    map.onscore = function() {
+      return hud.score.inc();
+    };
+    map.onend = function() {
+      return hud.reset();
+    };
+    scene.add(map);
+    return scene.add(hud);
+  };
+
+  return Game;
+
+})(Fz2D.Game);
+
+Game.run();
+
 Grid = (function() {
   function Grid(x1, y1, w1, h1, cx1, cy1) {
     this.x = x1;
@@ -156,6 +239,128 @@ Grid = (function() {
   return Grid;
 
 })();
+
+Hud = (function(superClass) {
+  var Button, Key;
+
+  extend(Hud, superClass);
+
+  Key = Fz2D.Input.Keyboard.Key;
+
+  Key.ONE = '1'.charCodeAt(0);
+
+  Key.TWO = '2'.charCodeAt(0);
+
+  Button = Fz2D.Input.Mouse.Button;
+
+  function Hud(w, h, sprites, storage1, version) {
+    var cx, cy, high_score_label, rect, score_label, text, version_label;
+    this.storage = storage1;
+    Hud.__super__.constructor.call(this, 0, 0, w, h);
+    this.font_16 = new Fz2D.Font(sprites.getTexture('font_16'), 16);
+    this.font_32 = new Fz2D.Font(sprites.getTexture('font_32'), 32);
+    text = 'Snakr';
+    rect = this.font_32.measureText(text);
+    cx = (w - rect.w) >> 1;
+    cy = (h - rect.h) >> 1;
+    cy -= rect.h << 1;
+    this.title = new Fz2D.Gui.Label(text, cx, cy, this.font_32);
+    this.add(this.title);
+    text = 'Press <Space> to start';
+    rect = this.font_16.measureText(text);
+    cx = (w - rect.w) >> 1;
+    cy = (h - rect.h) >> 1;
+    this.label = new Fz2D.Gui.Label(text, cx, cy, this.font_16);
+    this.label.blink = 800;
+    this.add(this.label);
+    this.label_2 = this.add(new Fz2D.Gui.Label('', 0, 0, this.font_16));
+    this.setControlScheme(this.getControlScheme());
+    text = "Score:";
+    rect = this.font_16.measureText(text);
+    score_label = new Fz2D.Gui.Label(text, 10, rect.h, this.font_16);
+    this.add(score_label);
+    this.score = new Fz2D.Gui.Label('0', rect.w + 10, rect.h, this.font_16);
+    this.add(this.score);
+    text = "High Score:";
+    rect = this.font_16.measureText(text);
+    high_score_label = new Fz2D.Gui.Label(text, 10, rect.h + 30, this.font_16);
+    this.add(high_score_label);
+    this.high_score = new Fz2D.Gui.Label(this.storage.get('highscore').toString(), rect.w + 10, rect.h + 30, this.font_16);
+    this.add(this.high_score);
+    version_label = new Fz2D.Gui.Label('v' + version, 10, h - 30, this.font_16);
+    this.add(version_label);
+    rect = this.font_32.measureText('3');
+    cx = (w - rect.w) >> 1;
+    cy = (h - rect.h) >> 1;
+    cy -= rect.h << 1;
+    this.countdown = this.add(new Fz2D.Gui.Countdown(3, cx, cy, this.font_32));
+    this.countdown.onend = (function(_this) {
+      return function() {
+        _this.countdown.kill();
+        return _this.onstart();
+      };
+    })(this);
+    this.countdown.exists = false;
+  }
+
+  Hud.prototype.onprestart = function() {};
+
+  Hud.prototype.onstart = function() {};
+
+  Hud.prototype.update = function(timer, input) {
+    Hud.__super__.update.apply(this, arguments);
+    if (!this.title.exists) {
+      return;
+    }
+    if (input.keys.pressed[Key.SPACE]) {
+      this.kill();
+      this.onprestart();
+      return this.countdown.reset();
+    } else if (input.keys.pressed[Key.ONE]) {
+      return this.setControlScheme(1);
+    } else if (input.keys.pressed[Key.TWO]) {
+      return this.setControlScheme(2);
+    }
+  };
+
+  Hud.prototype.kill = function() {
+    this.label.kill();
+    this.label_2.kill();
+    return this.title.kill();
+  };
+
+  Hud.prototype.reset = function() {
+    this.label.reset();
+    this.label_2.reset();
+    this.title.reset();
+    if (this.score.toInt() > this.high_score.toInt()) {
+      this.high_score.setText(this.score.text);
+      this.storage.set('highscore', this.score.text);
+    }
+    return this.score.setText('0');
+  };
+
+  Hud.prototype.setControlScheme = function(value) {
+    var rect, text;
+    this.storage.set('controlscheme', value);
+    if (value === 1) {
+      text = 'Control Scheme: (1) 2';
+    } else {
+      text = 'Control Scheme: 1 (2)';
+    }
+    rect = this.font_16.measureText(text);
+    this.label_2.x = (this.w - rect.w) >> 1;
+    this.label_2.y = ((this.h - rect.h) >> 1) + (rect.h << 2);
+    return this.label_2.setText(text);
+  };
+
+  Hud.prototype.getControlScheme = function() {
+    return this.storage.get('controlscheme', 1);
+  };
+
+  return Hud;
+
+})(Fz2D.Group);
 
 Iso = (function() {
   function Iso() {}
@@ -612,60 +817,6 @@ Random = (function() {
 
 })();
 
-Timer = (function() {
-  function Timer(interval) {
-    this.interval = interval;
-    if (this.interval == null) {
-      this.interval = 1000;
-    }
-    this.stop();
-  }
-
-  Timer.prototype.stop = function() {
-    this._dt = 0;
-    this.ticks = 0;
-    this.active = false;
-    this.ended = false;
-    return this.onstop();
-  };
-
-  Timer.prototype.reset = function(ticks) {
-    this._dt = 0;
-    this.ticks = ticks || 0;
-    this.active = true;
-    this.ended = false;
-    return this.onstart();
-  };
-
-  Timer.prototype.update = function(timer) {
-    if (!this.active) {
-      return;
-    }
-    this._dt += timer.dt;
-    if (this._dt < this.interval) {
-      return;
-    }
-    this._dt = 0;
-    this.ontick();
-    if (this.ticks > 0 && --this.ticks === 0) {
-      this.active = false;
-      this.ended = true;
-      return this.onend();
-    }
-  };
-
-  Timer.prototype.onstart = function() {};
-
-  Timer.prototype.onstop = function() {};
-
-  Timer.prototype.ontick = function() {};
-
-  Timer.prototype.onend = function() {};
-
-  return Timer;
-
-})();
-
 Snake = (function(superClass) {
   var Key;
 
@@ -847,207 +998,56 @@ Snake = (function(superClass) {
 
 })(Fz2D.Entity);
 
-Hud = (function(superClass) {
-  var Button, Key;
-
-  extend(Hud, superClass);
-
-  Key = Fz2D.Input.Keyboard.Key;
-
-  Key.ONE = '1'.charCodeAt(0);
-
-  Key.TWO = '2'.charCodeAt(0);
-
-  Button = Fz2D.Input.Mouse.Button;
-
-  function Hud(w, h, sprites, storage1, version) {
-    var cx, cy, high_score_label, rect, score_label, text, version_label;
-    this.storage = storage1;
-    Hud.__super__.constructor.call(this, 0, 0, w, h);
-    this.font_16 = new Fz2D.Font(sprites.getTexture('font_16'), 16);
-    this.font_32 = new Fz2D.Font(sprites.getTexture('font_32'), 32);
-    text = 'Snakr';
-    rect = this.font_32.measureText(text);
-    cx = (w - rect.w) >> 1;
-    cy = (h - rect.h) >> 1;
-    cy -= rect.h << 1;
-    this.title = new Fz2D.Gui.Label(text, cx, cy, this.font_32);
-    this.add(this.title);
-    text = 'Press <Space> to start';
-    rect = this.font_16.measureText(text);
-    cx = (w - rect.w) >> 1;
-    cy = (h - rect.h) >> 1;
-    this.label = new Fz2D.Gui.Label(text, cx, cy, this.font_16);
-    this.label.blink = 800;
-    this.add(this.label);
-    this.label_2 = this.add(new Fz2D.Gui.Label('', 0, 0, this.font_16));
-    this.setControlScheme(this.getControlScheme());
-    text = "Score:";
-    rect = this.font_16.measureText(text);
-    score_label = new Fz2D.Gui.Label(text, 10, rect.h, this.font_16);
-    this.add(score_label);
-    this.score = new Fz2D.Gui.Label('0', rect.w + 10, rect.h, this.font_16);
-    this.add(this.score);
-    text = "High Score:";
-    rect = this.font_16.measureText(text);
-    high_score_label = new Fz2D.Gui.Label(text, 10, rect.h + 30, this.font_16);
-    this.add(high_score_label);
-    this.high_score = new Fz2D.Gui.Label(this.storage.get('highscore').toString(), rect.w + 10, rect.h + 30, this.font_16);
-    this.add(this.high_score);
-    version_label = new Fz2D.Gui.Label('v' + version, 10, h - 30, this.font_16);
-    this.add(version_label);
-    rect = this.font_32.measureText('3');
-    cx = (w - rect.w) >> 1;
-    cy = (h - rect.h) >> 1;
-    cy -= rect.h << 1;
-    this.countdown = this.add(new Fz2D.Gui.Countdown(3, cx, cy, this.font_32));
-    this.countdown.onend = (function(_this) {
-      return function() {
-        _this.countdown.kill();
-        return _this.onstart();
-      };
-    })(this);
-    this.countdown.exists = false;
+Timer = (function() {
+  function Timer(interval) {
+    this.interval = interval;
+    if (this.interval == null) {
+      this.interval = 1000;
+    }
+    this.stop();
   }
 
-  Hud.prototype.onprestart = function() {};
+  Timer.prototype.stop = function() {
+    this._dt = 0;
+    this.ticks = 0;
+    this.active = false;
+    this.ended = false;
+    return this.onstop();
+  };
 
-  Hud.prototype.onstart = function() {};
+  Timer.prototype.reset = function(ticks) {
+    this._dt = 0;
+    this.ticks = ticks || 0;
+    this.active = true;
+    this.ended = false;
+    return this.onstart();
+  };
 
-  Hud.prototype.update = function(timer, input) {
-    Hud.__super__.update.apply(this, arguments);
-    if (!this.title.exists) {
+  Timer.prototype.update = function(timer) {
+    if (!this.active) {
       return;
     }
-    if (input.keys.pressed[Key.SPACE]) {
-      this.kill();
-      this.onprestart();
-      return this.countdown.reset();
-    } else if (input.keys.pressed[Key.ONE]) {
-      return this.setControlScheme(1);
-    } else if (input.keys.pressed[Key.TWO]) {
-      return this.setControlScheme(2);
+    this._dt += timer.dt;
+    if (this._dt < this.interval) {
+      return;
+    }
+    this._dt = 0;
+    this.ontick();
+    if (this.ticks > 0 && --this.ticks === 0) {
+      this.active = false;
+      this.ended = true;
+      return this.onend();
     }
   };
 
-  Hud.prototype.kill = function() {
-    this.label.kill();
-    this.label_2.kill();
-    return this.title.kill();
-  };
+  Timer.prototype.onstart = function() {};
 
-  Hud.prototype.reset = function() {
-    this.label.reset();
-    this.label_2.reset();
-    this.title.reset();
-    if (this.score.toInt() > this.high_score.toInt()) {
-      this.high_score.setText(this.score.text);
-      this.storage.set('highscore', this.score.text);
-    }
-    return this.score.setText('0');
-  };
+  Timer.prototype.onstop = function() {};
 
-  Hud.prototype.setControlScheme = function(value) {
-    var rect, text;
-    this.storage.set('controlscheme', value);
-    if (value === 1) {
-      text = 'Control Scheme: (1) 2';
-    } else {
-      text = 'Control Scheme: 1 (2)';
-    }
-    rect = this.font_16.measureText(text);
-    this.label_2.x = (this.w - rect.w) >> 1;
-    this.label_2.y = ((this.h - rect.h) >> 1) + (rect.h << 2);
-    return this.label_2.setText(text);
-  };
+  Timer.prototype.ontick = function() {};
 
-  Hud.prototype.getControlScheme = function() {
-    return this.storage.get('controlscheme', 1);
-  };
+  Timer.prototype.onend = function() {};
 
-  return Hud;
+  return Timer;
 
-})(Fz2D.Group);
-
-Game = (function(superClass) {
-  var Key;
-
-  extend(Game, superClass);
-
-  function Game() {
-    return Game.__super__.constructor.apply(this, arguments);
-  }
-
-  Key = Fz2D.Input.Keyboard.Key;
-
-  Game.prototype.version = '0.0.1';
-
-  Game.prototype.w = window.innerWidth;
-
-  Game.prototype.h = window.innerHeight;
-
-  Game.prototype.bg = '#D4D1A4';
-
-  Game.prototype.fg = '#000000';
-
-  Game.prototype.assets = {
-    sprites: 'sprites.atlas',
-    sounds: {
-      pickup: 'pickup.ogg',
-      hit: 'hit.ogg',
-      death: 'death.ogg'
-    }
-  };
-
-  Game.prototype.plugins = [Fz2D.Plugins.GitHub, Fz2D.Plugins.Stats, Fz2D.Plugins.Console, Fz2D.Plugins.GoogleAnalytics];
-
-  Game.prototype.github = {
-    username: 'icebreaker',
-    repository: 'snakr'
-  };
-
-  Game.prototype.ga = {
-    id: 'UA-3042007-2'
-  };
-
-  Game.prototype.volume = 10;
-
-  Game.prototype.onload = function(game) {
-    var assets, hud, k, map, scene, sound, sounds, sprites, storage;
-    if (Fz2D.production != null) {
-      game.input.mouse.hide();
-    }
-    assets = game.assets;
-    scene = game.scene;
-    storage = game.storage;
-    sprites = assets.sprites;
-    sounds = assets.sounds;
-    for (k in sounds) {
-      sound = sounds[k];
-      sound.setVolume(game.volume);
-    }
-    hud = new Hud(scene.w, scene.h, sprites, storage, game.version);
-    map = new Map(scene.w, scene.h, sprites, sounds);
-    hud.onprestart = function() {
-      map.reset();
-      map.snake.alive = false;
-      return map.snake.control_scheme = hud.getControlScheme();
-    };
-    hud.onstart = function() {
-      return map.snake.alive = true;
-    };
-    map.onscore = function() {
-      return hud.score.inc();
-    };
-    map.onend = function() {
-      return hud.reset();
-    };
-    scene.add(map);
-    return scene.add(hud);
-  };
-
-  return Game;
-
-})(Fz2D.Game);
-
-Game.run();
+})();
