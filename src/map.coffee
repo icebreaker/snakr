@@ -66,9 +66,9 @@ class Map extends Fz2D.Group
     @entities
 
   spawn: (name, ox, oy) ->
-    texture = @sprites.getTexture(@random.str(name))
-    [x, y, isox, isoy] = @grid.getRandomWithIso(ox, oy)
-    @entities.add(@grid.set(x, y, new Fz2D.Entity(texture, isox, isoy)))
+    entity = @entities.add(new Prop(@random.str(name), ox, oy, @sprites, @grid))
+    entity.reset()
+    entity
 
   spawnMan: () ->
     @man = @entities.add(new Man(@sprites, @grid))
@@ -77,6 +77,8 @@ class Map extends Fz2D.Group
     @man.onoutofspace = =>
       @snake.kill()
     @man.reset()
+
+    @entities.pits.last().reset()
     
   spawnSnake: () ->
     @snake = @entities.add(new Snake(@sprites, @grid))

@@ -47,8 +47,13 @@ class Game extends Fz2D.Game
     hud = new Hud(scene.w, scene.h, sprites, storage, game.version)
     map = new Map(scene.w, scene.h, sprites, sounds)
 
-    hud.onstart = ->
+    hud.onprestart = ->
       map.reset()
+      map.snake.alive = false
+      map.snake.control_scheme = hud.getControlScheme()
+
+    hud.onstart = ->
+      map.snake.alive = true
 
     map.onscore = ->
       hud.score.inc()

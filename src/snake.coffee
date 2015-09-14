@@ -2,7 +2,7 @@ class Snake extends Fz2D.Entity
   Key = Fz2D.Input.Keyboard.Key
 
   constructor: (@sprites, @grid) ->
-    [x, y, isox, isoy] = @grid.getRandomWithIso(-2, 16)
+    [x, y, isox, isoy] = @grid.getRandomWithIso(-2, 16, 7)
     @grid.set(x, y, @)
 
     super(@sprites.getTexture('snake_side'), isox, isoy)
@@ -37,6 +37,8 @@ class Snake extends Fz2D.Entity
         body.visible = !body.visible
     @timer.onend = =>
       @kill()
+
+    @control_scheme = 1
 
   kill: () ->
     super if @timer.ended
@@ -143,13 +145,14 @@ class Snake extends Fz2D.Entity
 
     @move(timer.dt)
 
-    #dx = input.keys.pressed[Key.DOWN] - input.keys.pressed[Key.UP]
-    #dy = input.keys.pressed[Key.LEFT] - input.keys.pressed[Key.RIGHT]
-
-    dx = input.keys.pressed[Key.DOWN] - input.keys.pressed[Key.UP]
-    dy = input.keys.pressed[Key.RIGHT] - input.keys.pressed[Key.LEFT]
-
-    @turn(dy, dx)
+    if @control_scheme == 1
+      dx = input.keys.pressed[Key.DOWN] - input.keys.pressed[Key.UP]
+      dy = input.keys.pressed[Key.LEFT] - input.keys.pressed[Key.RIGHT]
+      @turn(dx, dy)
+    else
+      dx = input.keys.pressed[Key.DOWN] - input.keys.pressed[Key.UP]
+      dy = input.keys.pressed[Key.RIGHT] - input.keys.pressed[Key.LEFT]
+      @turn(dx, dy)
 
   _play: () ->
     if @_dx > 0
