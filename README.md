@@ -4,6 +4,8 @@ Snakr is a *Snake* **clone** with a small twist.
 
 **WARNING: THIS IS NOT PRODUCTION QUALITY CODE.**
 
+![Screenshot](screenshot.png)
+
 **Powered by [Fz2D](https://github.com/icebreaker/fz2d).**
 
 Contribute
