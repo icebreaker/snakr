@@ -18,17 +18,13 @@ class Game extends Fz2D.Game
   plugins: [
     Fz2D.Plugins.GitHub,
     Fz2D.Plugins.Stats,
-    Fz2D.Plugins.Console,
-    Fz2D.Plugins.GoogleAnalytics
+    Fz2D.Plugins.Console
   ]
 
   github:
     username: 'icebreaker'
     repository: 'snakr'
   
-  ga:
-    id: 'UA-3042007-2'
-
   volume: 10
 
   onload: (game) ->
